@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif;background:#fafafa}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Numéros directs des SAMU</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style id="css">
+/* Layout: slim working header (search + filters), then a grid of department cards; hovering a card shows a mini map of France */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#0f1b2d; --muted:#5a6779; --line:#d9dfe8;
+  --navy:#13284b; --signal:#d7262e; --signal-soft:#fde8e8; --ok:#1d7a4d; --land:#dfe4ec; --landline:#ffffff;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1220; --surface:#131d30; --ink:#e8edf5; --muted:#9aa7bb; --line:#26334a;
+  --navy:#0e1a30; --signal:#ff5a60; --signal-soft:#3a1519; --ok:#4cc38a; --land:#2a3852; --landline:#131d30; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1220; --surface:#131d30; --ink:#e8edf5; --muted:#9aa7bb; --line:#26334a;
+  --navy:#0e1a30; --signal:#ff5a60; --signal-soft:#3a1519; --ok:#4cc38a; --land:#2a3852; --landline:#131d30; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px}
+
+.mast{background:var(--navy);color:#fff;position:relative}
+.mast::after{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;
+  background:repeating-linear-gradient(-45deg,var(--signal) 0 14px,#fff 14px 28px)}
+.mast-in{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:18px 24px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(28px,4vw,38px);line-height:1;margin:0;letter-spacing:.01em}
+h1 em{font-style:normal;color:#ff8a8f}
+.mast p{margin:4px 0 0;color:#cfd8e6;font-size:14px}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar-in{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-block:14px}
+.search{flex:1 1 280px;min-width:0;position:relative}
+.search input{width:100%;font:inherit;font-size:16px;padding:11px 14px 11px 40px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:14px;font-weight:600;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn{font:inherit;font-weight:600;font-size:14px;padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.mast .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.mast .btn.primary,.btn.primary{background:var(--signal);border-color:var(--signal);color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+.status{font-size:13px;color:var(--muted);width:100%}
+.status.ok{color:var(--ok)} .status.err{color:var(--signal)}
+
+main{padding-block:20px 48px}
+.meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:13px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:start;min-width:0}
+.card.first{border-color:var(--signal);box-shadow:0 0 0 1px var(--signal)}
+.plate{grid-row:1/3;font-family:var(--display);font-weight:800;font-size:26px;line-height:1;min-width:58px;text-align:center;padding:10px 6px;border-radius:8px;background:var(--signal-soft);color:var(--signal);font-variant-numeric:tabular-nums}
+.dep{font-weight:700;min-width:0;overflow-wrap:anywhere;padding-right:30px}
+.centre{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;min-width:0;overflow-wrap:anywhere}
+.mapbtn{position:absolute;top:10px;right:10px;width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;padding:0}
+.mapbtn[aria-expanded="true"]{color:var(--signal);border-color:var(--signal)}
+.tel{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:10px;border-top:1px dashed var(--line)}
+.num{font-family:var(--display);font-weight:700;font-size:27px;letter-spacing:.02em;font-variant-numeric:tabular-nums;user-select:all;white-space:nowrap}
+.copy{font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;flex:none}
+.copy.done{color:var(--ok);border-color:var(--ok)}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0}
+
+/* Tooltip */
+.tip{position:fixed;z-index:20;width:210px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;box-shadow:0 10px 30px rgba(10,20,40,.18);pointer-events:none}
+.tip-t{font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.tip-t span{color:var(--signal);font-family:var(--display);font-size:16px}
+.tip svg{display:block;width:100%;height:auto}
+.tip path{fill:var(--land);stroke:var(--landline);stroke-width:.8}
+.tip path.on{fill:var(--signal)}
+.tip-om{font-size:12.5px;color:var(--muted);padding:6px 0 2px}
+.tip-note{font-size:11.5px;color:var(--muted);margin-top:6px}
+
+/* Edit mode */
+.card.edit{grid-template-columns:1fr;gap:8px;border-color:var(--signal)}
+.card.edit label{display:grid;gap:3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.card.edit input{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;font-weight:500;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;min-width:0}
+.card.edit input.big{font-family:var(--display);font-size:22px;font-weight:700}
+.row2{display:grid;grid-template-columns:80px 1fr;gap:8px}
+.del{justify-self:start;font:inherit;font-size:13px;font-weight:600;color:var(--signal);background:none;border:none;padding:4px 0;cursor:pointer}
+.add{border:2px dashed var(--line);border-radius:12px;background:transparent;color:var(--muted);font:inherit;font-weight:600;min-height:150px;cursor:pointer}
+
+footer{border-top:1px solid var(--line);padding-block:18px 32px;color:var(--muted);font-size:12.5px}
+footer p{max-width:80ch;margin:0 0 4px}
+footer .copy-r{margin-top:10px;font-weight:600;color:var(--ink)}
+</style>
+<meta name="author" content="Matéo-CALLÉJA">
+</head>
+<body>
+<div id="app"></div>
+
+<script type="application/json" id="state">{"updated":"2026-10-06","rows":[["01","Ain","Samu 01 Bourg-en-Bresse","04 74 45 27 28"],["02","Aisne","Samu 02 Laon","03 23 26 20 20"],["03","Allier","Samu 03 Moulins","04 70 46 46 46"],["04","Alpes-de-Haute-Provence","Samu 04 Digne","04 92 32 49 15"],["05","Hautes-Alpes","Samu 05 Gap","04 92 51 02 15"],["06","Alpes-Maritimes","Samu 06 Nice","04 93 92 55 55"],["07","Ardèche","Samu 07 Privas","04 75 66 36 15"],["08","Ardennes","Samu 08 Charleville-Mézières","03 24 56 76 55"],["09","Ariège","Samu 09 Saint-Jean-de-Verges","05 61 05 40 15"],["10","Aube","Samu 10 Troyes","03 25 82 33 33"],["11","Aude","Samu 11 Carcassonne","04 68 11 78 70"],["12","Aveyron","Samu 12 Rodez","05 65 68 60 60"],["13","Bouches-du-Rhône","Samu 13 Marseille","04 91 49 91 91"],["14","Calvados","Samu 14 Caen","02 31 06 88 88"],["15","Cantal","Samu 15 Aurillac","04 71 48 15 20"],["16","Charente","Samu 16 Saint-Michel","05 45 24 42 00"],["17","Charente-Maritime","Samu 17 La Rochelle","05 46 27 32 15"],["18","Cher","Samu 18 Bourges","02 48 65 15 15"],["19","Corrèze","Samu 19 Tulle","05 55 26 00 00"],["2A","Corse-du-Sud","Samu 2A Ajaccio","04 95 51 60 00"],["2B","Haute-Corse","Samu 2B Bastia-Furiani","04 95 33 15 15"],["21","Côte-d'Or","Samu 21 Dijon","03 80 40 28 29"],["22","Côtes-d'Armor","Samu 22 Saint-Brieuc","02 96 75 14 00"],["23","Creuse","Samu 23 Guéret","05 55 41 82 00"],["24","Dordogne","Samu 24 Périgueux","05 53 07 88 36"],["25","Doubs","Samu 25","03 81 53 15 15"],["26","Drôme","Samu 26 Valence","04 75 82 31 00"],["27","Eure","Samu 27 Évreux","02 32 78 09 27"],["28","Eure-et-Loir","Samu 28 Dreux","02 37 46 15 15"],["29","Finistère","Samu 29 Brest","02 29 02 20 04"],["30","Gard","Samu 30 Nîmes","04 66 68 66 68"],["31","Haute-Garonne","Samu 31 Toulouse","05 61 49 33 33"],["32","Gers","Samu 32 Auch","05 62 61 67 50"],["33","Gironde","Samu 33 Bordeaux","05 51 01 16 02"],["34","Hérault","Samu 34 Montpellier","04 99 06 66 68"],["35","Ille-et-Vilaine","Samu 35 Rennes","02 99 59 16 16"],["36","Indre","Samu 36 Châteauroux","02 54 22 70 17"],["37","Indre-et-Loire","Samu 37 Tours","02 47 25 70 00"],["38","Isère","Samu 38 Grenoble","04 76 42 42 42"],["39","Jura","Samu 25","03 81 53 15 15"],["40","Landes","Samu 40 Mont-de-Marsan","05 58 75 44 44"],["41","Loir-et-Cher","Samu 41 Blois","02 54 78 78 78"],["42","Loire","Samu 42 Saint-Étienne","04 77 81 01 75"],["43","Haute-Loire","Samu 43 Le Puy-en-Velay","04 71 02 02 02"],["44","Loire-Atlantique","Samu 44 Nantes","02 40 08 22 22"],["45","Loiret","Samu 45 Orléans","02 38 69 94 10"],["46","Lot","Samu 46 Cahors","05 65 20 51 51"],["47","Lot-et-Garonne","Samu 47 Agen","05 53 48 95 74"],["48","Lozère","Samu 48 Mende","04 66 65 22 22"],["49","Maine-et-Loire","Samu 49 Angers","02 41 34 45 97"],["50","Manche","Samu 50 Saint-Lô","02 33 72 15 15"],["51","Marne","Samu 51 Reims","03 26 06 07 08"],["52","Haute-Marne","Samu 52 Chaumont","03 25 32 68 08"],["53","Mayenne","Samu 53 Laval","02 43 64 10 30"],["54","Meurthe-et-Moselle","Samu 54","03 83 22 54 54"],["55","Meuse","Samu 55 Verdun","03 29 86 15 30"],["56","Morbihan","Samu 56 Vannes","02 97 01 41 40"],["57","Moselle","Samu 57 Metz","03 87 33 33 33"],["58","Nièvre","Samu 21 Dijon","03 80 40 28 29"],["59","Nord","Samu 59 Lille","03 20 44 00 97"],["60","Oise","Samu 60 Beauvais","03 44 11 21 15"],["61","Orne","Samu 61 Alençon","02 33 32 75 75"],["62","Pas-de-Calais","Samu 62 Arras","03 21 71 51 51"],["63","Puy-de-Dôme","Samu 63 Clermont-Ferrand","04 73 41 40 33"],["64","Pyrénées-Atlantiques","Samu 64 A Bayonne","05 59 58 22 82"],["65","Hautes-Pyrénées","Samu 65 Tarbes","05 62 93 59 99"],["66","Pyrénées-Orientales","Samu 66 Perpignan","04 68 61 66 66"],["67","Bas-Rhin","Samu 67","03 88 87 90 15"],["68","Haut-Rhin","Samu 68 Mulhouse","03 89 56 80 91"],["69","Rhône","Samu 69 Lyon","04 72 68 93 00"],["70","Haute-Saône","Samu 25","03 81 53 15 15"],["71","Saône-et-Loire","Samu 71 Chalon-sur-Saône","03 85 42 45 90"],["72","Sarthe","Samu 72 Le Mans","02 43 51 10 72"],["73","Savoie","Samu 73 Chambéry","04 79 68 63 15"],["74","Haute-Savoie","Samu 74 Annecy","04 50 05 51 15"],["75","Paris","Samu 75 Paris","01 45 67 50 50"],["76","Seine-Maritime","Samu 76A Rouen","02 35 58 76 15"],["77","Seine-et-Marne","Samu 77 Melun","01 64 14 14 20"],["78","Yvelines","Samu 78 Le Chesnay","01 30 84 96 00"],["79","Deux-Sèvres","Samu 79 Niort","05 49 73 95 15"],["80","Somme","Samu 80 Amiens","03 22 44 33 33"],["81","Tarn","Samu 81 Albi","05 63 47 15 15"],["82","Tarn-et-Garonne","Samu 82 Montauban","05 63 92 82 15"],["83","Var","Samu 83 Toulon","04 94 13 25 00"],["84","Vaucluse","Samu 84 Avignon","04 90 14 09 78"],["85","Vendée","Samu 85 La Roche-sur-Yon","02 51 44 57 67"],["86","Vienne","Samu 86 Poitiers","05 49 38 08 15"],["87","Haute-Vienne","Samu 87 Limoges","05 55 33 33 33"],["88","Vosges","Samu 88 Épinal","03 29 29 94 34"],["89","Yonne","Samu 89 Auxerre","03 86 94 54 04"],["90","Territoire de Belfort","Samu 25","03 81 53 15 15"],["91","Essonne","Samu 91 Corbeil-Essonnes","01 69 13 91 15"],["92","Hauts-de-Seine","Samu 92 Garches","01 47 10 70 10"],["93","Seine-Saint-Denis","Samu 93 Bobigny","01 48 96 44 44"],["94","Val-de-Marne","Samu 94 Créteil","01 45 17 95 00"],["95","Val-d'Oise","Samu 95 Pontoise","01 30 20 52 20"],["971","Guadeloupe","Samu 971 Pointe-à-Pitre","05 90 91 39 39"],["972","Martinique","Samu 972 Fort-de-France","05 96 75 15 75"],["973","Guyane","Samu 973 Cayenne","05 94 29 69 75"],["974","La Réunion","Samu 974 Saint-Denis","02 62 20 15 15"],["976","Mayotte","Samu 976 Mayotte","02 69 61 79 75"],["987","Polynésie (Papeete)","Samu 987 Papeete","00 689 46 62 50"],["988","Nouvelle-Calédonie (Nouméa)","Samu 988 Nouméa","00 687 25 67 15"]]}</script>
+
+<script id="main">
+(function(){
+  var saved = JSON.parse(document.getElementById('state').textContent);
+  var STANDALONE = !(window.claude && window.claude.use), LS_KEY = 'samu-lignes-directes';
+  if (STANDALONE) {
+    try { var ls = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (ls && Array.isArray(ls.rows)) saved = ls; } catch (e) {}
+  }
+  var rows = saved.rows.map(function(r){return r.slice();});
+  var editing = false, query = '', zone = 'all', artifactApi = null;
+  var app = document.getElementById('app');
+  var MAP_URL = 'https://cdn.jsdelivr.net/npm/@svg-maps/france.departments@2.0.0/index.js';
+
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function norm(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+  function isOM(code){return String(code).trim().length === 3;}
+  function fmtDate(d){try{return new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}catch(e){return d;}}
+  var pinIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+
+  app.innerHTML =
+    '<header class="mast"><div class="wrap mast-in"><div>' +
+      '<h1>Lignes directes <em>SAMU</em></h1>' +
+      '<p>Numéro direct de chaque SAMU départemental, si le 15 d\'un autre département est saturé.</p>' +
+    '</div><div class="chips" id="acts"></div></div></header>' +
+    '<div class="bar"><div class="wrap bar-in">' +
+      '<div class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+      '<input id="q" type="search" autocomplete="off" placeholder="N° de département, nom ou ville (ex. 69, Lyon)" aria-label="Rechercher un SAMU" autofocus></div>' +
+      '<div class="chips" role="group" aria-label="Zone">' +
+        '<button class="chip" data-zone="all" aria-pressed="true">Tous</button>' +
+        '<button class="chip" data-zone="metro" aria-pressed="false">Métropole</button>' +
+        '<button class="chip" data-zone="om" aria-pressed="false">Outre-mer</button>' +
+      '</div>' +
+      '<div id="status" class="status" hidden></div>' +
+    '</div></div>' +
+    '<main class="wrap"><div class="meta"><span id="count"></span><span>Entrée : copier le 1er résultat · Échap : effacer</span></div>' +
+    '<div id="grid" class="grid"></div></main>' +
+    '<footer class="wrap"><p>Mise à jour : ' + esc(fmtDate(saved.updated)) + '. Liste initiale : ministère des Solidarités et de la Santé (2021).</p>' +
+    '<p>Le Samu 25 couvre aussi le Jura, la Haute-Saône et le Territoire de Belfort ; le Samu 21 couvre la Nièvre.</p>' +
+    '<p class="copy-r">© ' + new Date().getFullYear() + ' Matéo-CALLÉJA. Tous droits réservés.</p></footer>' +
+    '<div class="tip" id="tip" hidden></div>';
+
+  var grid = document.getElementById('grid'), count = document.getElementById('count'), acts = document.getElementById('acts'),
+      status = document.getElementById('status'), qInput = document.getElementById('q'), tip = document.getElementById('tip');
+
+  function setStatus(msg, kind){status.hidden = !msg; status.textContent = msg || ''; status.className = 'status' + (kind ? ' ' + kind : '');}
+
+  function renderActs(){
+    acts.innerHTML = editing
+      ? '<button class="btn" id="cancel">Annuler</button><button class="btn primary" id="save">Enregistrer</button>'
+      : '<button class="btn" id="edit">Modifier les numéros</button>';
+  }
+
+  function matches(r){
+    if (zone === 'metro' && isOM(r[0])) return false;
+    if (zone === 'om' && !isOM(r[0])) return false;
+    var q = norm(query.trim()); if (!q) return true;
+    if (norm(r[0]) === q) return true;
+    if (norm(r[0] + ' ' + r[1] + ' ' + r[2]).indexOf(q) !== -1) return true;
+    var qd = q.replace(/\D/g,'');
+    return qd.length >= 4 && r[3].replace(/\D/g,'').indexOf(qd) !== -1;
+  }
+
+  function visible(){
+    var out = [];
+    rows.forEach(function(r, i){ if (editing || matches(r)) out.push(i); });
+    var q = norm(query.trim());
+    if (q && !editing) out.sort(function(a,b){ return (norm(rows[b][0]) === q) - (norm(rows[a][0]) === q); });
+    return out;
+  }
+
+  function render(){
+    hideTip();
+    var idx = visible();
+    count.textContent = idx.length + (idx.length > 1 ? ' départements' : ' département');
+    var html = idx.map(function(i, n){
+      var r = rows[i];
+      if (editing) {
+        return '<div class="card edit" data-i="' + i + '">' +
+          '<div class="row2"><label>N°<input id="c' + i + '" data-f="0" value="' + esc(r[0]) + '"></label>' +
+          '<label>Département<input id="d' + i + '" data-f="1" value="' + esc(r[1]) + '"></label></div>' +
+          '<label>Centre SAMU<input id="s' + i + '" data-f="2" value="' + esc(r[2]) + '"></label>' +
+          '<label>Numéro direct<input class="big" id="t' + i + '" data-f="3" inputmode="tel" value="' + esc(r[3]) + '"></label>' +
+          '<button class="del" data-del="' + i + '">Supprimer cette ligne</button></div>';
+      }
+      return '<article class="card' + (n === 0 && query.trim() ? ' first' : '') + '" data-i="' + i + '">' +
+        '<div class="plate">' + esc(r[0]) + '</div>' +
+        '<div class="dep">' + esc(r[1]) + '</div><div class="centre">' + esc(r[2]) + '</div>' +
+        '<button class="mapbtn" data-map="' + i + '" aria-expanded="false" aria-label="Voir ' + esc(r[1]) + ' sur la carte">' + pinIcon + '</button>' +
+        '<div class="tel"><span class="num">' + esc(r[3]) + '</span>' +
+        '<button class="copy" data-copy="' + esc(r[3]) + '">Copier</button></div></article>';
+    }).join('');
+    if (editing) html += '<button class="add" id="add">+ Ajouter un département</button>';
+    if (!idx.length && !editing) html = '<div class="empty">Aucun résultat pour « ' + esc(query) + ' ».</div>';
+    grid.innerHTML = html;
+  }
+
+  /* ---- Mini map tooltip ---- */
+  var mapSvg = null, mapState = 'idle', tipCard = null, tipTimer = null;
+  function loadMap(){
+    if (mapState !== 'idle') return;
+    mapState = 'loading';
+    import(MAP_URL).then(function(mod){
+      var m = mod.default;
+      mapSvg = '<svg viewBox="' + m.viewBox + '" role="img" aria-hidden="true">' +
+        m.locations.map(function(l){return '<path data-id="' + String(l.id).toUpperCase() + '" d="' + l.path + '"/>';}).join('') + '</svg>';
+      mapState = 'ready';
+      if (tipCard) showTip(tipCard);
+    }, function(){ mapState = 'failed'; if (tipCard) showTip(tipCard); });
+  }
+
+  function showTip(card){
+    var r = rows[Number(card.dataset.i)]; if (!r) return;
+    tipCard = card; loadMap();
+    var code = String(r[0]).trim().toUpperCase();
+    var body;
+    if (isOM(code)) body = '<div class="tip-om">Outre-mer : département hors métropole.</div>';
+    else if (mapState === 'ready') body = mapSvg;
+    else if (mapState === 'failed') body = '<div class="tip-om">Carte indisponible pour le moment.</div>';
+    else body = '<div class="tip-om">Chargement de la carte…</div>';
+    tip.innerHTML = '<div class="tip-t">' + esc(r[1]) + '<span>' + esc(r[0]) + '</span></div>' + body +
+      '<div class="tip-note">' + esc(r[2]) + '</div>';
+    var p = tip.querySelector('path[data-id="' + code + '"]'); if (p) { p.classList.add('on'); p.parentNode.appendChild(p); }
+    tip.hidden = false;
+    var b = card.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    var left = b.right + 10; if (left + w > vw - 8) left = b.left - w - 10; if (left < 8) left = Math.max(8, Math.min(vw - w - 8, b.left));
+    var top = b.top; if (left === b.left || (left >= b.left && left < b.right)) top = b.bottom + 8;
+    if (top + h > vh - 8) top = Math.max(8, b.top - h - 8);
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+    grid.querySelectorAll('.mapbtn[aria-expanded="true"]').forEach(function(x){x.setAttribute('aria-expanded','false');});
+    var mb = card.querySelector('.mapbtn'); if (mb) mb.setAttribute('aria-expanded','true');
+  }
+  function hideTip(){
+    clearTimeout(tipTimer); tip.hidden = true; tipCard = null;
+    grid && grid.querySelectorAll('.mapbtn[aria-expanded="true"]').forEach(function(x){x.setAttribute('aria-expanded','false');});
+  }
+
+  var finePointer = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (finePointer) {
+    grid.addEventListener('mouseover', function(e){
+      var card = e.target.closest('.card:not(.edit)'); if (!card || card === tipCard) return;
+      clearTimeout(tipTimer); tipTimer = setTimeout(function(){ showTip(card); }, 280);
+    });
+    grid.addEventListener('mouseleave', hideTip);
+    grid.addEventListener('mouseout', function(e){
+      var card = e.target.closest('.card'); if (card && !card.contains(e.relatedTarget)) { clearTimeout(tipTimer); if (tipCard === card) hideTip(); }
+    });
+  }
+  window.addEventListener('scroll', function(){ if (!tip.hidden) hideTip(); }, {passive:true});
+
+  /* ---- Actions ---- */
+  function copy(btn){
+    var v = btn.dataset.copy;
+    var done = function(){btn.textContent = 'Copié ✓'; btn.classList.add('done'); setTimeout(function(){btn.textContent = 'Copier'; btn.classList.remove('done');}, 1500);};
+    var fallback = function(){var el = btn.parentNode.querySelector('.num'); var s = window.getSelection(); var rg = document.createRange(); rg.selectNodeContents(el); s.removeAllRanges(); s.addRange(rg); btn.textContent = 'Ctrl+C';};
+    try { navigator.clipboard.writeText(v).then(done, fallback); } catch (e) { fallback(); }
+  }
+
+  function sortRows(){
+    function k(c){c = String(c).toUpperCase(); if (c === '2A') return 20.1; if (c === '2B') return 20.2; var n = parseFloat(c); return isNaN(n) ? 9999 : n;}
+    rows.sort(function(a,b){return k(a[0]) - k(b[0]);});
+  }
+
+  function buildDocument(){
+    var json = JSON.stringify({updated: new Date().toISOString().slice(0,10), rows: rows}).replace(/</g,'\\u003c');
+    return '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">' +
+      '<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif;background:#fafafa}img{max-width:100%}[hidden]{display:none!important}</style></head><body>' +
+      '<title>Numéros directs des SAMU</title>\n' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">\n' +
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap">\n' +
+      '<style id="css">' + document.getElementById('css').textContent + '</style>\n\n<div id="app"></div>\n\n' +
+      '<script type="application/json" id="state">' + json + '<\/script>\n\n' +
+      '<script id="main">' + document.getElementById('main').textContent + '<\/script>' +
+      '</body></html>';
+  }
+
+  async function save(){
+    rows = rows.map(function(r){return r.map(function(v){return String(v).trim();});})
+               .filter(function(r){return r[0] || r[1] || r[3];});
+    sortRows();
+    var btn = document.getElementById('save'); if (btn) btn.disabled = true;
+    if (STANDALONE) {
+      try {
+        saved = {updated: new Date().toISOString().slice(0,10), rows: rows.map(function(r){return r.slice();})};
+        localStorage.setItem(LS_KEY, JSON.stringify(saved));
+        editing = false; renderActs(); render();
+        setStatus('Enregistré dans ce navigateur. Les autres postes gardent leur propre liste.', 'ok');
+      } catch (e) {
+        setStatus('Ce navigateur bloque l\'enregistrement local. Les modifications seront perdues à la fermeture.', 'err');
+        if (btn) btn.disabled = false;
+      }
+      return;
+    }
+    if (!artifactApi) { setStatus('Enregistrement impossible depuis cette vue : seul le propriétaire de la page peut sauvegarder.', 'err'); if (btn) btn.disabled = false; return; }
+    setStatus('Enregistrement…');
+    try {
+      await artifactApi.publish(buildDocument());
+      setStatus('Enregistré. La page se recharge…', 'ok');
+    } catch (e) {
+      var c = e && e.code;
+      setStatus(c === 'conflict' ? 'Une autre version a été enregistrée entre-temps ; la page se recharge avec celle-ci.'
+        : (c === 'not_granted' || c === 'not_writer') ? 'Vous n\'avez pas les droits pour modifier cette page.'
+        : 'L\'enregistrement a échoué. Réessayez.', 'err');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  qInput.addEventListener('input', function(e){ query = e.target.value; render(); });
+  qInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !editing) { var b = grid.querySelector('.copy'); if (b) { e.preventDefault(); copy(b); } }
+    if (e.key === 'Escape') { qInput.value = ''; query = ''; render(); }
+  });
+
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('button');
+    if (!t) { if (!tip.hidden && !finePointer) hideTip(); return; }
+    if (t.dataset.zone) {
+      zone = t.dataset.zone;
+      document.querySelectorAll('[data-zone]').forEach(function(b){b.setAttribute('aria-pressed', String(b === t));});
+      render(); return;
+    }
+    if (t.dataset.map !== undefined) {
+      var card = t.closest('.card');
+      if (tipCard === card) hideTip(); else showTip(card);
+      return;
+    }
+    if (t.id === 'edit') { editing = true; setStatus(''); renderActs(); render(); return; }
+    if (t.id === 'cancel') { editing = false; rows = saved.rows.map(function(r){return r.slice();}); setStatus(''); renderActs(); render(); return; }
+    if (t.id === 'save') { save(); return; }
+    if (t.id === 'add') {
+      rows.push(['', '', 'Samu ', '']);
+      zone = 'all'; document.querySelectorAll('[data-zone]').forEach(function(b){b.setAttribute('aria-pressed', String(b.dataset.zone === 'all'));});
+      render(); var cs = grid.querySelectorAll('.card.edit'); var last = cs[cs.length - 1]; if (last) last.querySelector('input').focus(); return;
+    }
+    if (t.dataset.del !== undefined) { rows.splice(Number(t.dataset.del), 1); render(); return; }
+    if (t.dataset.copy) copy(t);
+  });
+
+  grid.addEventListener('input', function(e){
+    var card = e.target.closest('.card.edit'); if (!card) return;
+    rows[Number(card.dataset.i)][Number(e.target.dataset.f)] = e.target.value;
+  });
+
+  renderActs(); render();
+  if (window.claude && window.claude.use) window.claude.use('artifact').then(function(a){ artifactApi = a; }, function(){});
+})();
+</script>
+
+</body>
+</html>
